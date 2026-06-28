@@ -65,10 +65,16 @@ The exact wildcard/format conventions accepted by
 <https://liteldev.github.io/LeviLaunchroid/api/signature>. Match that syntax.
 
 ## Step 4 — Wire it in
-Put the pattern into the config the mod reads on the device:
-`…/games/com.mojang/terramath/terramath.json`
+Two ways, both with no recompile:
+
+**In-game (fastest):** open the TerraMath menu → *Terrain hook (binary)* → paste
+the pattern into **Signature**, set **Hook mode** (`height` or `density`, per
+Step 2), tap **Install terrain hook**. The status line / logcat reports success.
+
+**Config file:** edit `…/games/com.mojang/terramath/terramath.json`:
 ```json
-"terrainSignature": "1F 20 03 D5 ?? ?? ?? 94 ..."
+"terrainSignature": "1F 20 03 D5 ?? ?? ?? 94 ...",
+"terrainHookMode": "height"
 ```
 Restart Minecraft. On success the log shows:
 ```

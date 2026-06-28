@@ -6,29 +6,32 @@
 //   produced by native column/chunk generation in libminecraftpe.so. This
 //   module resolves that generation function by *signature* (regenerated from
 //   the user's own binary — see docs/SIGNATURE_ANALYSIS.md) and detours it so
-//   the surface height comes from FormulaEngine instead.
+//   the terrain comes from FormulaEngine instead.
+//
+// TWO INTEGRATION SEAMS (select via config "terrainHookMode")
+//   * "height"  -> the resolved function is a per-column surface-height query:
+//                    int f(void* self, int worldX, int worldZ);
+//                  The detour returns FormulaEngine::surfaceY(x, z).
+//   * "density" -> the resolved function is a per-voxel solidity/density query:
+//                    int f(void* self, int worldX, int worldY, int worldZ);
+//                  The detour returns solid/air from FormulaEngine::compute.
+//   Pick the seam that matches the function you identified in IDA, and adjust
+//   the parameter mapping below if your build's argument order differs. This is
+//   the one place that depends on the binary.
 //
 // WHY THERE IS NO HARDCODED SIGNATURE
-//   The hook target's address/bytes differ per Minecraft Bedrock build and ABI.
-//   Shipping a guessed pattern would be a fabricated, crash-prone offset, which
-//   this project refuses to do. The signature is supplied at runtime via
-//   config ("terrainSignature"). When empty, the hook stays disabled and the
-//   engine/UI still run (you can preview formulas; terrain is just unchanged).
-//
-// THE INTEGRATION SEAM
-//   `TerrainColumnHeightFn` below is the prototype the resolved function is
-//   expected to match: a per-column surface-height query
-//   `int f(void* self, int worldX, int worldZ)`. After IDA identifies the real
-//   function, confirm its prototype matches this shape (self, x, z -> height in
-//   blocks). If your target's generator exposes a different shape (e.g. a
-//   density fill), swap to the density path (FormulaEngine::compute) documented
-//   in HOOK_ANALYSIS.md. This is the one place that depends on the binary.
+//   The target's address/bytes differ per Bedrock build and ABI. Shipping a
+//   guessed pattern would be a fabricated, crash-prone offset, which this
+//   project refuses to do. The signature is supplied at runtime via config
+//   ("terrainSignature"); when empty, the hook stays disabled and the engine/UI
+//   still run.
 // -----------------------------------------------------------------------------
 #include "Hooks.h"
 
 #if defined(__ANDROID__)
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 
@@ -45,29 +48,66 @@ namespace {
 constexpr int kMinWorldY = -64;   // Bedrock 1.18+ overworld floor
 constexpr int kMaxWorldY = 319;   // Bedrock 1.18+ overworld ceiling
 
-// The prototype the resolved generation function is expected to match.
-using TerrainColumnHeightFn = int (*)(void* self, int worldX, int worldZ);
+std::atomic<bool> g_installed{false};
 
-TerrainColumnHeightFn g_originalHeight = nullptr;
+// --- "height" seam ----------------------------------------------------------
+using ColumnHeightFn = int (*)(void* self, int worldX, int worldZ);
+ColumnHeightFn g_origHeight = nullptr;
 
-// Detour: ask the original generator (so non-overridden behaviour/biomes still
-// run), then replace the height with the formula result when the engine active.
 int Detour_ColumnHeight(void* self, int worldX, int worldZ) {
-    int original = g_originalHeight ? g_originalHeight(self, worldX, worldZ) : 64;
-
+    int original = g_origHeight ? g_origHeight(self, worldX, worldZ) : 64;
     FormulaEngine& engine = FormulaEngine::instance();
     if (!engine.active()) return original;
 
     double y = engine.surfaceY(worldX, worldZ);
     if (y <= -1e8 || std::isnan(y) || std::isinf(y)) return original;
+    return std::clamp(static_cast<int>(std::lround(y)), kMinWorldY, kMaxWorldY);
+}
 
-    int h = static_cast<int>(std::lround(y));
-    return std::clamp(h, kMinWorldY, kMaxWorldY);
+// --- "density" seam ---------------------------------------------------------
+// Returns a solidity value; >0 == solid block, <=0 == air (matches the common
+// Bedrock per-voxel generator shape). FormulaEngine::compute returns +1 / -1.
+using VoxelDensityFn = int (*)(void* self, int worldX, int worldY, int worldZ);
+VoxelDensityFn g_origDensity = nullptr;
+
+int Detour_VoxelDensity(void* self, int worldX, int worldY, int worldZ) {
+    int original = g_origDensity ? g_origDensity(self, worldX, worldY, worldZ) : 0;
+    FormulaEngine& engine = FormulaEngine::instance();
+    if (!engine.active()) return original;
+
+    double d = engine.compute(worldX, worldY, worldZ);  // +1 solid / -1 air
+    if (std::isnan(d) || std::isinf(d)) return original;
+    return d >= 0.0 ? 1 : -1;
+}
+
+bool installAt(uintptr_t addr, const std::string& mode) {
+    void* handle = nullptr;
+    if (mode == "density") {
+        handle = GlossHook(reinterpret_cast<void*>(addr),
+                           reinterpret_cast<void*>(&Detour_VoxelDensity),
+                           reinterpret_cast<void**>(&g_origDensity));
+    } else {  // default "height"
+        handle = GlossHook(reinterpret_cast<void*>(addr),
+                           reinterpret_cast<void*>(&Detour_ColumnHeight),
+                           reinterpret_cast<void**>(&g_origHeight));
+    }
+    if (handle == nullptr) {
+        TM_LOGE("GlossHook failed to install the terrain detour at %p (mode=%s).",
+                reinterpret_cast<void*>(addr), mode.c_str());
+        return false;
+    }
+    return true;
 }
 
 }  // namespace
 
-bool installTerrainHook(const std::string& signature) {
+bool terrainHookInstalled() { return g_installed.load(std::memory_order_acquire); }
+
+bool installTerrainHook(const std::string& signature, const std::string& mode) {
+    if (g_installed.load(std::memory_order_acquire)) {
+        TM_LOGW("Terrain hook already installed; ignoring re-install request.");
+        return false;
+    }
     if (signature.empty()) {
         TM_LOGW(
             "terrainSignature is empty -> terrain hook disabled. The formula "
@@ -85,17 +125,11 @@ bool installTerrainHook(const std::string& signature) {
         return false;
     }
 
-    void* handle = GlossHook(reinterpret_cast<void*>(addr),
-                             reinterpret_cast<void*>(&Detour_ColumnHeight),
-                             reinterpret_cast<void**>(&g_originalHeight));
-    if (handle == nullptr) {
-        TM_LOGE("GlossHook failed to install the terrain detour at %p.",
-                reinterpret_cast<void*>(addr));
-        return false;
-    }
+    if (!installAt(addr, mode)) return false;
 
-    TM_LOGI("Terrain hook installed at %p (signature resolved).",
-            reinterpret_cast<void*>(addr));
+    g_installed.store(true, std::memory_order_release);
+    TM_LOGI("Terrain hook installed at %p (mode=%s, signature resolved).",
+            reinterpret_cast<void*>(addr), mode.c_str());
     return true;
 }
 
@@ -104,7 +138,8 @@ bool installTerrainHook(const std::string& signature) {
 #else  // non-Android host build: terrain hook is a no-op (engine is tested directly).
 
 namespace terramath {
-bool installTerrainHook(const std::string&) { return false; }
+bool installTerrainHook(const std::string&, const std::string&) { return false; }
+bool terrainHookInstalled() { return false; }
 }  // namespace terramath
 
 #endif

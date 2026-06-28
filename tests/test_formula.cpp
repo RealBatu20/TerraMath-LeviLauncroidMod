@@ -195,12 +195,14 @@ int main() {
         c.terrain.noiseType = NoiseType::Perlin;
         c.terrain.useDensityMode = true;
         c.terrainSignature = "DE AD BE EF ?? 90";
+        c.terrainHookMode = "density";
         Config r = Config::fromJson(c.toJson());
         check(r.terrain.formula == c.terrain.formula, "config formula round-trips");
         approx(r.terrain.coordinateScale, 7.5, "config scale round-trips");
         check(r.terrain.noiseType == NoiseType::Perlin, "config noiseType round-trips");
         check(r.terrain.useDensityMode, "config bool round-trips");
         check(r.terrainSignature == "DE AD BE EF ?? 90", "config signature round-trips");
+        check(r.terrainHookMode == "density", "config hook mode round-trips");
     }
 
     std::printf("\n%d checks, %d failures\n", g_checks, g_failures);

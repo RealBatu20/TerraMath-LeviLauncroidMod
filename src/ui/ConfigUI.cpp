@@ -29,6 +29,7 @@ Config g_cfg;
 char g_formula[1024] = {0};
 std::string g_status = "Idle.";
 char g_seedBuf[32] = "0";
+char g_sigBuf[512] = {0};
 
 std::string configPath() { return g_dataDir + "/terramath.json"; }
 
@@ -38,6 +39,7 @@ void loadOnce() {
     std::snprintf(g_formula, sizeof(g_formula), "%s", g_cfg.terrain.formula.c_str());
     std::snprintf(g_seedBuf, sizeof(g_seedBuf), "%llu",
                   (unsigned long long)g_cfg.terrain.seed);
+    std::snprintf(g_sigBuf, sizeof(g_sigBuf), "%s", g_cfg.terrainSignature.c_str());
     std::string err;
     if (FormulaEngine::instance().apply(g_cfg.terrain, err))
         g_status = g_cfg.terrain.formula.empty() ? "No formula (vanilla terrain)."
@@ -122,6 +124,7 @@ void drawConfigWindow() {
         g_cfg.terrain.formula = g_formula;
         g_cfg.terrain.seed = std::strtoull(g_seedBuf, nullptr, 10);
         g_cfg.baseFormula = g_formula;
+        g_cfg.terrainSignature = g_sigBuf;
         g_status = g_cfg.save(configPath()) ? "Saved." : "Save failed (check storage perms).";
     }
     ImGui::SameLine();
@@ -156,6 +159,26 @@ void drawConfigWindow() {
                             &kNoiseScaleMin, &kNoiseScaleMax, "%.1f");
         ImGui::SliderScalar("Noise height scale", ImGuiDataType_Double,
                             &g_cfg.terrain.noiseHeightScale, &kNoiseHMin, &kNoiseHMax, "%.2f");
+    }
+
+    ImGui::SeparatorText("Terrain hook (binary)");
+    ImGui::TextWrapped(
+        "Paste the byte signature of your libminecraftpe.so generation function "
+        "(see docs/SIGNATURE_ANALYSIS.md). Empty = engine/menu only.");
+    ImGui::InputText("Signature", g_sigBuf, sizeof(g_sigBuf));
+    {
+        static const char* kModes[] = {"height", "density"};
+        int modeIdx = (g_cfg.terrainHookMode == "density") ? 1 : 0;
+        if (ImGui::Combo("Hook mode", &modeIdx, kModes, IM_ARRAYSIZE(kModes)))
+            g_cfg.terrainHookMode = kModes[modeIdx];
+    }
+    if (terrainHookInstalled()) {
+        ImGui::TextDisabled("Terrain hook: installed (restart to change).");
+    } else if (ImGui::Button("Install terrain hook")) {
+        g_cfg.terrainSignature = g_sigBuf;
+        bool ok = installTerrainHook(g_cfg.terrainSignature, g_cfg.terrainHookMode);
+        g_status = ok ? "Terrain hook installed."
+                      : "Hook not installed (empty/unresolved signature - see logcat).";
     }
 
     ImGui::SeparatorText("Preview");

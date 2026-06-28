@@ -12,5 +12,6 @@
   "noiseScaleY": 30.000000,
   "noiseScaleZ": 30.000000,
   "noiseHeightScale": 4.000000,
-  "terrainSignature": ""
+  "terrainSignature": "",
+  "terrainHookMode": "height"
 }
