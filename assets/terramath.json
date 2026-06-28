@@ -1,0 +1,16 @@
+{
+  "baseFormula": "sin(x) * cos(z) * 10",
+  "formula": "sin(x) * cos(z) * 10",
+  "useDefaultFormula": true,
+  "coordinateScale": 5.000000,
+  "baseHeight": 64.000000,
+  "heightVariation": 32.500000,
+  "smoothingFactor": 0.550000,
+  "useDensityMode": false,
+  "noiseType": "NONE",
+  "noiseScaleX": 30.000000,
+  "noiseScaleY": 30.000000,
+  "noiseScaleZ": 30.000000,
+  "noiseHeightScale": 4.000000,
+  "terrainSignature": ""
+}
