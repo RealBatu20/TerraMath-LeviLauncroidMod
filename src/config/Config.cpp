@@ -97,7 +97,8 @@ std::string Config::toJson() const {
     o << "  \"noiseScaleY\": " << terrain.noiseScaleY << ",\n";
     o << "  \"noiseScaleZ\": " << terrain.noiseScaleZ << ",\n";
     o << "  \"noiseHeightScale\": " << terrain.noiseHeightScale << ",\n";
-    o << "  \"terrainSignature\": \"" << jsonEscape(terrainSignature) << "\"\n";
+    o << "  \"terrainSignature\": \"" << jsonEscape(terrainSignature) << "\",\n";
+    o << "  \"terrainHookMode\": \"" << jsonEscape(terrainHookMode) << "\"\n";
     o << "}\n";
     return o.str();
 }
@@ -118,6 +119,7 @@ Config Config::fromJson(const std::string& j) {
     c.terrain.noiseScaleZ = readNumber(j, "noiseScaleZ", 30.0);
     c.terrain.noiseHeightScale = readNumber(j, "noiseHeightScale", 4.0);
     c.terrainSignature = readString(j, "terrainSignature", "");
+    c.terrainHookMode = readString(j, "terrainHookMode", "height");
 
     // Mirror ModConfig.initializeDefaultValues: fall back to baseFormula.
     if (c.terrain.formula.empty() && c.useDefaultFormula) c.terrain.formula = c.baseFormula;

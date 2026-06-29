@@ -40,11 +40,16 @@ not binary-version-specific). One — the terrain hook — targets
   The detour calls the original (so biomes/decoration still run), then replaces
   the height with `FormulaEngine::surfaceY(worldX, worldZ)` clamped to
   `[-64, 319]`.
-- **If your generator isn't column-height shaped:** switch to the density path.
-  `FormulaEngine::compute(x, y, z)` returns the Java-equivalent density sign
-  (`+1` solid / `-1` air). Hook whatever per-voxel density/solidity function you
-  identify and return solid when `compute(...) >= 0`. Both paths are implemented;
-  only the function prototype + signature change.
+- **Both seams are implemented and selectable** via config `terrainHookMode`:
+  - `"height"` → detours `int f(self, x, z)` to `FormulaEngine::surfaceY`.
+  - `"density"` → detours `int f(self, x, y, z)` to `FormulaEngine::compute`
+    (returns `+1` solid / `-1` air). Choose the one matching the function you
+    identified; adjust the parameter mapping in `TerrainHook.cpp` if argument
+    order differs.
+- **Live install:** the in-game menu has a *Terrain hook (binary)* section —
+  paste the signature, pick the mode, tap **Install terrain hook** — so you can
+  resolve/hook without editing JSON or restarting. Install is one-shot per
+  session (guarded against double-hooking).
 - **Why no hardcoded signature:** offsets/bytes differ per Bedrock build and
   ABI. A guessed pattern would be fabricated and crash-prone. Empty signature →
   hook disabled (engine/UI still run). See SIGNATURE_ANALYSIS.md.

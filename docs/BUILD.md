@@ -69,11 +69,18 @@ keeps the shared object small and strips debug symbols for distribution.
 - `android` job: builds the `.so` and uploads it as an artifact — runs only when
   the repo variable `PRELOADER_GIT` is set to a git URL whose checkout exposes
   `include/pl/Gloss.h` (so the SDK isn't fetched from a guessed location).
-- Tagging publishes a GitHub Release with the `.so` attached:
+- `release` job: on every `v*` tag, once tests pass, publishes a GitHub Release
+  with auto-generated notes. The `libterramath.so` is attached **only if the
+  android job built it** (i.e. when `PRELOADER_GIT` is set); otherwise the
+  Release is still created without the binary.
+- Tagging:
   ```bash
   git tag v1.0.0
   git push origin v1.0.0
   ```
+  To get the `.so` attached to releases, set the repo variable once:
+  *Settings → Secrets and variables → Actions → Variables →* `PRELOADER_GIT` =
+  your Levi Launchroid SDK git URL.
 
 ## Notes on shared libraries / ABI
 - The mod is an ELF shared object loaded into the Minecraft process; its

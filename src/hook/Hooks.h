@@ -14,8 +14,13 @@ extern std::string g_dataDir;
 bool installUiHooks();
 
 // Installs the terrain-generation hook in libminecraftpe.so using the signature
-// from config. Returns false (and logs) if the signature is empty/unresolved —
-// in that case the engine + UI still run, but generated terrain is unchanged.
-bool installTerrainHook(const std::string& signature);
+// from config. `mode` selects the detour shape: "height" (column surface) or
+// "density" (per-voxel solidity). Returns false (and logs) if the signature is
+// empty/unresolved or already installed — in that case the engine + UI still
+// run, but generated terrain is unchanged.
+bool installTerrainHook(const std::string& signature, const std::string& mode = "height");
+
+// True once a terrain hook has been successfully installed this session.
+bool terrainHookInstalled();
 
 }  // namespace terramath

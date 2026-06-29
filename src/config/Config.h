@@ -28,6 +28,12 @@ struct Config {
     // from your binary; never ship a guessed value.
     std::string terrainSignature = "";
 
+    // Which detour to install for the resolved function:
+    //   "height"  -> column surface-height seam (FormulaEngine::surfaceY)
+    //   "density" -> per-voxel solidity seam     (FormulaEngine::compute)
+    // Pick the one matching the function you identified (see HOOK_ANALYSIS.md).
+    std::string terrainHookMode = "height";
+
     // Load from path; returns defaults if the file is missing/unreadable.
     static Config load(const std::string& path);
     // Atomically write to path. Returns false on I/O error.
