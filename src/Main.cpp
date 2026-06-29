@@ -81,7 +81,9 @@ __attribute__((constructor)) static void TerraMath_Init() {
     }
 
     installUiHooks();
-    installTerrainHook(cfg.terrainSignature, cfg.terrainHookMode);
+    std::string hookStatus;
+    installTerrainHookAuto(cfg.resolver, hookStatus);
+    TM_LOGI("Terrain hook: %s", hookStatus.c_str());
 
     TM_LOGI("TerraMath-LeviLauncroidMod initialised.");
 }

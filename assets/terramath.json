@@ -12,6 +12,8 @@
   "noiseScaleY": 30.000000,
   "noiseScaleZ": 30.000000,
   "noiseHeightScale": 4.000000,
+  "terrainAutoDetect": true,
+  "terrainSymbolHints": "ChunkGenerator::getHeight,NoiseBasedChunkGenerator,OverworldGenerator,buildSurface",
   "terrainSignature": "",
   "terrainHookMode": "height"
 }

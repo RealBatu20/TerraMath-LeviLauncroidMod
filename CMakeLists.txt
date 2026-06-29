@@ -61,6 +61,7 @@ if(ANDROID)
         src/hook/EglHook.cpp
         src/hook/InputHook.cpp
         src/hook/TerrainHook.cpp
+        src/hook/AutoResolver.cpp
         src/ui/ImGuiManager.cpp
         src/ui/ConfigUI.cpp
     )

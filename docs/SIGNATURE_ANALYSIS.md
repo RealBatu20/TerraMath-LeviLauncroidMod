@@ -1,11 +1,27 @@
-# Signature Analysis — finding the terrain hook in `libminecraftpe.so`
+# Terrain targeting — automatic, with a manual fallback
 
-This is the **one** value the scaffold cannot supply, because it depends on your
-exact Minecraft Bedrock build. Below is the full workflow to obtain it and wire
-it in. Nothing here is guessed; you generate it against your own binary.
+**You normally do nothing here.** At load time the mod auto-detects Minecraft's
+terrain-generation function and hooks it (`src/hook/AutoResolver.cpp`):
 
-> Status of the shipped value: `terrainSignature` is **empty** by default. With
-> it empty the formula engine and menu work, but generated terrain is unchanged.
+1. It finds `libminecraftpe.so` in the process (`dl_iterate_phdr`).
+2. It walks the loaded module's dynamic symbol table, **demangles** each function
+   name (`abi::__cxa_demangle`), and matches the configured hints
+   (`terrainSymbolHints`, default targets the overworld height function).
+3. The matched address is hooked; a prologue byte pattern is auto-generated for
+   display/logging only.
+
+All of this is editable live in the menu's **Advanced** section (toggle
+auto-detect, edit the symbol hints, choose height/density mode). No byte
+signature is required in the normal case.
+
+The rest of this document is the **fallback** for the uncommon case where a
+particular Bedrock build is stripped of the relevant symbols, so auto-detect
+can't find them. Then you locate the function in IDA and either tighten the hint
+or paste a signature. Nothing here is guessed; you generate it against your own
+binary.
+
+> Default config ships `terrainAutoDetect: true` and an empty `terrainSignature`.
+> If auto-detect succeeds (the common case) the manual signature is never used.
 
 ## What you need
 - The `libminecraftpe.so` (arm64-v8a) for the Bedrock version you target — pull
