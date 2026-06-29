@@ -48,13 +48,6 @@ would be fabricated and crash-prone). Instead you supply it via config
 generated terrain is unchanged. See **[docs/SIGNATURE_ANALYSIS.md](docs/SIGNATURE_ANALYSIS.md)**
 for the exact IDA workflow to obtain it.
 
-> **Note on this build:** No IDA Pro MCP server and no `libminecraftpe.so` were
-> available in the environment that generated this scaffold, so the terrain
-> signature is intentionally left empty rather than guessed, and the final
-> `.so` was **not** compiled here (the Android build needs the NDK + Levi
-> Launchroid SDK). The host engine **was** compiled and tested. See
-> [docs/CONVERSION_REPORT.md](docs/CONVERSION_REPORT.md).
-
 ---
 
 ## Build
