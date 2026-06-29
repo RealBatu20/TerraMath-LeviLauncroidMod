@@ -11,6 +11,7 @@
 #include "../config/Config.h"
 #include "../hook/Hooks.h"
 #include "../terrain/FormulaEngine.h"
+#include "../terrain/Presets.h"
 #include "../terrain/TerrainSettings.h"
 
 namespace terramath::ui {
@@ -27,39 +28,38 @@ const double kNoiseHMin = 0.0, kNoiseHMax = 64.0;
 bool g_loaded = false;
 Config g_cfg;
 char g_formula[1024] = {0};
-std::string g_status = "Idle.";
 char g_seedBuf[32] = "0";
+char g_hintsBuf[512] = {0};
 char g_sigBuf[512] = {0};
+int  g_presetIdx = 0;
+std::string g_status = "Idle.";
 
 std::string configPath() { return g_dataDir + "/terramath.json"; }
+
+void syncBuffersFromCfg() {
+    std::snprintf(g_formula, sizeof(g_formula), "%s", g_cfg.terrain.formula.c_str());
+    std::snprintf(g_seedBuf, sizeof(g_seedBuf), "%llu",
+                  (unsigned long long)g_cfg.terrain.seed);
+    std::snprintf(g_hintsBuf, sizeof(g_hintsBuf), "%s", g_cfg.resolver.symbolHints.c_str());
+    std::snprintf(g_sigBuf, sizeof(g_sigBuf), "%s", g_cfg.resolver.manualSignature.c_str());
+}
+
+void applyEngine(const char* okMsg) {
+    g_cfg.terrain.formula = g_formula;
+    g_cfg.terrain.seed = std::strtoull(g_seedBuf, nullptr, 10);
+    std::string err;
+    if (FormulaEngine::instance().apply(g_cfg.terrain, err))
+        g_status = g_cfg.terrain.formula.empty() ? "No formula (vanilla terrain)." : okMsg;
+    else
+        g_status = "Parse error: " + err;
+}
 
 void loadOnce() {
     if (g_loaded) return;
     g_cfg = Config::load(configPath());
-    std::snprintf(g_formula, sizeof(g_formula), "%s", g_cfg.terrain.formula.c_str());
-    std::snprintf(g_seedBuf, sizeof(g_seedBuf), "%llu",
-                  (unsigned long long)g_cfg.terrain.seed);
-    std::snprintf(g_sigBuf, sizeof(g_sigBuf), "%s", g_cfg.terrainSignature.c_str());
-    std::string err;
-    if (FormulaEngine::instance().apply(g_cfg.terrain, err))
-        g_status = g_cfg.terrain.formula.empty() ? "No formula (vanilla terrain)."
-                                                 : "Active.";
-    else
-        g_status = "Parse error: " + err;
+    syncBuffersFromCfg();
+    applyEngine("Active.");
     g_loaded = true;
-}
-
-void doApply() {
-    g_cfg.terrain.formula = g_formula;
-    g_cfg.terrain.seed = std::strtoull(g_seedBuf, nullptr, 10);
-    std::string err;
-    if (FormulaEngine::instance().apply(g_cfg.terrain, err)) {
-        g_status = g_cfg.terrain.formula.empty()
-                       ? "Applied: empty formula (vanilla terrain)."
-                       : "Applied. Newly generated chunks will use this formula.";
-    } else {
-        g_status = "Parse error: " + err;
-    }
 }
 
 void noiseCombo() {
@@ -69,9 +69,26 @@ void noiseCombo() {
         g_cfg.terrain.noiseType = static_cast<NoiseType>(idx);
 }
 
+void drawPresets() {
+    const auto& ps = presets();
+    std::vector<const char*> names;
+    names.reserve(ps.size() + 1);
+    names.push_back("- custom -");
+    for (const auto& p : ps) names.push_back(p.name);
+
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::Combo("##presets", &g_presetIdx, names.data(),
+                     static_cast<int>(names.size())) &&
+        g_presetIdx > 0) {
+        applyPreset(ps[g_presetIdx - 1], g_cfg.terrain);
+        syncBuffersFromCfg();
+        applyEngine("Preset applied. New chunks will use it.");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Copy formula")) ImGui::SetClipboardText(g_formula);
+}
+
 void drawPreview() {
-    // Lightweight surface preview: surfaceY across x at z = 0, from the engine's
-    // currently-applied settings (press Apply to refresh).
     if (!FormulaEngine::instance().active()) {
         ImGui::TextDisabled("Preview unavailable (no active formula).");
         return;
@@ -93,50 +110,84 @@ void drawPreview() {
                      ImVec2(-1, 120));
 }
 
+void drawAdvanced() {
+    if (!ImGui::CollapsingHeader("Advanced — terrain hook")) return;
+
+    ImGui::TextWrapped(
+        "The mod finds Minecraft's terrain generator automatically. You normally "
+        "never touch this. Edit only if auto-detect fails on your build.");
+
+    ImGui::Checkbox("Auto-detect generator", &g_cfg.resolver.autoDetect);
+    ImGui::InputText("Symbol hints", g_hintsBuf, sizeof(g_hintsBuf));
+    {
+        static const char* kModes[] = {"height", "density"};
+        int modeIdx = (g_cfg.resolver.hookMode == "density") ? 1 : 0;
+        if (ImGui::Combo("Hook mode", &modeIdx, kModes, IM_ARRAYSIZE(kModes)))
+            g_cfg.resolver.hookMode = kModes[modeIdx];
+    }
+
+    if (terrainHookInstalled()) {
+        ImGui::TextDisabled("Status: installed (restart to retarget).");
+    } else if (ImGui::Button("Detect & install now")) {
+        g_cfg.resolver.symbolHints = g_hintsBuf;
+        g_cfg.resolver.manualSignature = g_sigBuf;
+        std::string s;
+        installTerrainHookAuto(g_cfg.resolver, s);
+        g_status = s;
+    }
+
+    if (ImGui::TreeNode("Manual signature override (optional)")) {
+        ImGui::TextWrapped("Leave empty to rely on auto-detect.");
+        ImGui::InputText("Signature", g_sigBuf, sizeof(g_sigBuf));
+        ImGui::TreePop();
+    }
+}
+
 }  // namespace
 
 void drawConfigWindow() {
     loadOnce();
 
     ImGuiIO& io = ImGui::GetIO();
-    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.7f),
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.75f),
                              ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.2f, io.DisplaySize.y * 0.12f),
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.2f, io.DisplaySize.y * 0.1f),
                             ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("TerraMath", nullptr, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
 
-    ImGui::TextWrapped(
-        "Custom terrain via a math formula. Use x, z (and y) plus functions like "
-        "sin, cos, perlin, clamp. Example: sin(x)*cos(z)*10");
-    ImGui::Separator();
+    ImGui::SeparatorText("Presets");
+    drawPresets();
 
-    ImGui::InputTextMultiline("##formula", g_formula, sizeof(g_formula),
-                              ImVec2(-1, ImGui::GetTextLineHeight() * 3.0f));
-    ImGui::InputText("Seed", g_seedBuf, sizeof(g_seedBuf),
-                     ImGuiInputTextFlags_CharsDecimal);
+    ImGui::SeparatorText("Formula");
+    ImGui::TextWrapped("Use x, z (and y) with sin, cos, perlin, clamp, ... e.g. sin(x)*cos(z)*10");
+    if (ImGui::InputTextMultiline("##formula", g_formula, sizeof(g_formula),
+                                  ImVec2(-1, ImGui::GetTextLineHeight() * 3.0f)))
+        g_presetIdx = 0;  // editing => custom
+    ImGui::InputText("Seed", g_seedBuf, sizeof(g_seedBuf), ImGuiInputTextFlags_CharsDecimal);
 
-    if (ImGui::Button("Apply")) doApply();
+    if (ImGui::Button("Apply")) applyEngine("Applied. New chunks will use this formula.");
     ImGui::SameLine();
     if (ImGui::Button("Save")) {
         g_cfg.terrain.formula = g_formula;
         g_cfg.terrain.seed = std::strtoull(g_seedBuf, nullptr, 10);
         g_cfg.baseFormula = g_formula;
-        g_cfg.terrainSignature = g_sigBuf;
-        g_status = g_cfg.save(configPath()) ? "Saved." : "Save failed (check storage perms).";
+        g_cfg.resolver.symbolHints = g_hintsBuf;
+        g_cfg.resolver.manualSignature = g_sigBuf;
+        g_status = g_cfg.save(configPath()) ? "Saved." : "Save failed (storage perms?).";
     }
     ImGui::SameLine();
     if (ImGui::Button("Reset")) {
-        std::string sig = g_cfg.terrainSignature;  // keep the binary signature
+        ResolverConfig keep = g_cfg.resolver;
         g_cfg = Config{};
-        g_cfg.terrainSignature = sig;
-        std::snprintf(g_formula, sizeof(g_formula), "%s", g_cfg.terrain.formula.c_str());
-        g_status = "Reset to defaults.";
+        g_cfg.resolver = keep;
+        g_presetIdx = 0;
+        syncBuffersFromCfg();
+        applyEngine("Reset to defaults.");
     }
 
-    ImGui::Separator();
     ImGui::SeparatorText("Terrain parameters");
     ImGui::SliderScalar("Coordinate scale", ImGuiDataType_Double,
                         &g_cfg.terrain.coordinateScale, &kScaleMin, &kScaleMax, "%.2f");
@@ -161,33 +212,17 @@ void drawConfigWindow() {
                             &g_cfg.terrain.noiseHeightScale, &kNoiseHMin, &kNoiseHMax, "%.2f");
     }
 
-    ImGui::SeparatorText("Terrain hook (binary)");
-    ImGui::TextWrapped(
-        "Paste the byte signature of your libminecraftpe.so generation function "
-        "(see docs/SIGNATURE_ANALYSIS.md). Empty = engine/menu only.");
-    ImGui::InputText("Signature", g_sigBuf, sizeof(g_sigBuf));
-    {
-        static const char* kModes[] = {"height", "density"};
-        int modeIdx = (g_cfg.terrainHookMode == "density") ? 1 : 0;
-        if (ImGui::Combo("Hook mode", &modeIdx, kModes, IM_ARRAYSIZE(kModes)))
-            g_cfg.terrainHookMode = kModes[modeIdx];
-    }
-    if (terrainHookInstalled()) {
-        ImGui::TextDisabled("Terrain hook: installed (restart to change).");
-    } else if (ImGui::Button("Install terrain hook")) {
-        g_cfg.terrainSignature = g_sigBuf;
-        bool ok = installTerrainHook(g_cfg.terrainSignature, g_cfg.terrainHookMode);
-        g_status = ok ? "Terrain hook installed."
-                      : "Hook not installed (empty/unresolved signature - see logcat).";
-    }
-
     ImGui::SeparatorText("Preview");
     drawPreview();
 
     ImGui::Separator();
+    drawAdvanced();
+
+    ImGui::Separator();
     ImGui::TextWrapped("Status: %s", g_status.c_str());
-    ImGui::TextDisabled("Terrain hook: %s",
-                        FormulaEngine::instance().active() ? "engine active" : "inactive");
+    ImGui::TextDisabled("Terrain hook: %s | Engine: %s",
+                        terrainHookInstalled() ? "installed" : "auto/not yet",
+                        FormulaEngine::instance().active() ? "active" : "idle");
 
     ImGui::End();
 }

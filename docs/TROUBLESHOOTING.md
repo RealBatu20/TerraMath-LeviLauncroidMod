@@ -32,10 +32,13 @@ This is the known per-device input-ownership case.
 ## Terrain doesn't change after Apply
 - Apply affects **newly generated** chunks only — fly to ungenerated terrain or
   make a new world.
-- More likely: the **terrain hook is disabled**. Check logcat for `terrainSignature
-  is empty -> terrain hook disabled` or `Failed to resolve terrainSignature`.
-  Provide/repair the signature (SIGNATURE_ANALYSIS.md). The engine being
-  "active" only means the formula compiled — the world hook is separate.
+- Check the terrain hook installed: logcat should show `Auto-resolver: matched
+  '…' at 0x…` and `Terrain hook auto-installed`. If instead you see `Auto-resolver:
+  no symbol matched the hints`, this Bedrock build is stripped of the generator
+  symbols — open the menu's **Advanced** section, adjust **Symbol hints** (or set
+  a manual signature, SIGNATURE_ANALYSIS.md), and tap **Detect & install now**.
+- The engine being "active" only means the formula compiled — the world hook is
+  separate (shown as *Terrain hook: installed* at the bottom of the menu).
 
 ## "Parse error" in the menu
 - The status line shows the parser message (e.g. unknown function, wrong arity,

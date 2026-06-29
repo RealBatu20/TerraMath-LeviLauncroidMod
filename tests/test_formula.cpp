@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../src/config/Config.h"
+#include "../src/terrain/Presets.h"
 #include "../src/math/Expr.h"
 #include "../src/math/MathFunctions.h"
 #include "../src/math/Noise.h"
@@ -194,15 +195,39 @@ int main() {
         c.terrain.coordinateScale = 7.5;
         c.terrain.noiseType = NoiseType::Perlin;
         c.terrain.useDensityMode = true;
-        c.terrainSignature = "DE AD BE EF ?? 90";
-        c.terrainHookMode = "density";
+        c.resolver.autoDetect = false;
+        c.resolver.symbolHints = "Foo::bar,Baz";
+        c.resolver.manualSignature = "DE AD BE EF ?? 90";
+        c.resolver.hookMode = "density";
         Config r = Config::fromJson(c.toJson());
         check(r.terrain.formula == c.terrain.formula, "config formula round-trips");
         approx(r.terrain.coordinateScale, 7.5, "config scale round-trips");
         check(r.terrain.noiseType == NoiseType::Perlin, "config noiseType round-trips");
         check(r.terrain.useDensityMode, "config bool round-trips");
-        check(r.terrainSignature == "DE AD BE EF ?? 90", "config signature round-trips");
-        check(r.terrainHookMode == "density", "config hook mode round-trips");
+        check(!r.resolver.autoDetect, "config autoDetect round-trips");
+        check(r.resolver.symbolHints == "Foo::bar,Baz", "config symbolHints round-trips");
+        check(r.resolver.manualSignature == "DE AD BE EF ?? 90", "config manual signature round-trips");
+        check(r.resolver.hookMode == "density", "config hook mode round-trips");
+
+        // Default config: auto-detect on, no manual signature.
+        Config def;
+        check(def.resolver.autoDetect, "default autoDetect is on");
+        check(def.resolver.manualSignature.empty(), "default has no manual signature");
+    }
+
+    // --- every preset must parse and generate finite terrain ----------------
+    for (const auto& p : presets()) {
+        TerrainSettings s;
+        applyPreset(p, s);
+        s.seed = 7;
+        std::string err;
+        bool ok = FormulaEngine::instance().apply(s, err);
+        check(ok, std::string("preset parses: ") + p.name + " (" + err + ")");
+        if (ok) {
+            double y = FormulaEngine::instance().surfaceY(12, -8);
+            check(y > -1e8 && std::isfinite(y),
+                  std::string("preset yields finite surface: ") + p.name);
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", g_checks, g_failures);

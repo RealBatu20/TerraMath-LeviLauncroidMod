@@ -17,7 +17,7 @@ cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
 cmake --build build-host --target terramath_tests -j
 ctest --test-dir build-host --output-on-failure
 ```
-Expected: `100% tests passed` (47 checks in the formula-engine suite).
+Expected: `100% tests passed` (76 checks in the formula-engine suite).
 
 ## 2. Levi Launchroid / Gloss SDK
 The Android target needs the preloader headers (`pl/Gloss.h`, `pl/Signature.h`,

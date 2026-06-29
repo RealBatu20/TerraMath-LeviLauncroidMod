@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "ResolverConfig.h"
+
 namespace terramath {
 
 // Path to the mod's config/data directory (created under the game's files dir).
@@ -19,6 +21,12 @@ bool installUiHooks();
 // empty/unresolved or already installed — in that case the engine + UI still
 // run, but generated terrain is unchanged.
 bool installTerrainHook(const std::string& signature, const std::string& mode = "height");
+
+// Preferred path: auto-detect the generation function (no signature needed),
+// falling back to cfg.manualSignature only if auto-detect is off or fails.
+// Fills `outStatus` with a short human-readable result for the UI. Returns true
+// on successful install.
+bool installTerrainHookAuto(const ResolverConfig& cfg, std::string& outStatus);
 
 // True once a terrain hook has been successfully installed this session.
 bool terrainHookInstalled();

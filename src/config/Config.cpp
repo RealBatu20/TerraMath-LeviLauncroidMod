@@ -97,8 +97,10 @@ std::string Config::toJson() const {
     o << "  \"noiseScaleY\": " << terrain.noiseScaleY << ",\n";
     o << "  \"noiseScaleZ\": " << terrain.noiseScaleZ << ",\n";
     o << "  \"noiseHeightScale\": " << terrain.noiseHeightScale << ",\n";
-    o << "  \"terrainSignature\": \"" << jsonEscape(terrainSignature) << "\",\n";
-    o << "  \"terrainHookMode\": \"" << jsonEscape(terrainHookMode) << "\"\n";
+    o << "  \"terrainAutoDetect\": " << (resolver.autoDetect ? "true" : "false") << ",\n";
+    o << "  \"terrainSymbolHints\": \"" << jsonEscape(resolver.symbolHints) << "\",\n";
+    o << "  \"terrainSignature\": \"" << jsonEscape(resolver.manualSignature) << "\",\n";
+    o << "  \"terrainHookMode\": \"" << jsonEscape(resolver.hookMode) << "\"\n";
     o << "}\n";
     return o.str();
 }
@@ -118,8 +120,10 @@ Config Config::fromJson(const std::string& j) {
     c.terrain.noiseScaleY = readNumber(j, "noiseScaleY", 30.0);
     c.terrain.noiseScaleZ = readNumber(j, "noiseScaleZ", 30.0);
     c.terrain.noiseHeightScale = readNumber(j, "noiseHeightScale", 4.0);
-    c.terrainSignature = readString(j, "terrainSignature", "");
-    c.terrainHookMode = readString(j, "terrainHookMode", "height");
+    c.resolver.autoDetect = readBool(j, "terrainAutoDetect", true);
+    c.resolver.symbolHints = readString(j, "terrainSymbolHints", c.resolver.symbolHints);
+    c.resolver.manualSignature = readString(j, "terrainSignature", "");
+    c.resolver.hookMode = readString(j, "terrainHookMode", "height");
 
     // Mirror ModConfig.initializeDefaultValues: fall back to baseFormula.
     if (c.terrain.formula.empty() && c.useDefaultFormula) c.terrain.formula = c.baseFormula;

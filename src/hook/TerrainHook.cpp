@@ -37,6 +37,7 @@
 
 #include "../terrain/FormulaEngine.h"
 #include "../util/Log.h"
+#include "AutoResolver.h"
 
 // Levi Launchroid / Gloss preloader SDK (provided by the build, see CMakeLists).
 #include "pl/Gloss.h"
@@ -133,12 +134,52 @@ bool installTerrainHook(const std::string& signature, const std::string& mode) {
     return true;
 }
 
+bool installTerrainHookAuto(const ResolverConfig& cfg, std::string& outStatus) {
+    if (g_installed.load(std::memory_order_acquire)) {
+        outStatus = "Already installed.";
+        return false;
+    }
+
+    // 1) Auto-detect by resolving the generation function from the binary.
+    if (cfg.autoDetect) {
+        ResolveResult r = autoResolveTerrainFunction(cfg);
+        if (r.ok && installAt(r.address, cfg.hookMode)) {
+            g_installed.store(true, std::memory_order_release);
+            outStatus = "Auto-detected & hooked (" + r.matchedName + ").";
+            TM_LOGI("Terrain hook auto-installed at %p (mode=%s).",
+                    reinterpret_cast<void*>(r.address), cfg.hookMode.c_str());
+            return true;
+        }
+    }
+
+    // 2) Fallback: a manual signature, only if one was deliberately provided.
+    if (!cfg.manualSignature.empty()) {
+        uintptr_t addr =
+            pl::signature::pl_resolve_signature(cfg.manualSignature.c_str(), "libminecraftpe.so");
+        if (addr != 0 && installAt(addr, cfg.hookMode)) {
+            g_installed.store(true, std::memory_order_release);
+            outStatus = "Hooked via manual signature.";
+            return true;
+        }
+        outStatus = "Manual signature did not resolve.";
+        return false;
+    }
+
+    outStatus = cfg.autoDetect ? "Auto-detect found no match (adjust hints in Advanced)."
+                               : "Auto-detect off and no manual signature set.";
+    return false;
+}
+
 }  // namespace terramath
 
 #else  // non-Android host build: terrain hook is a no-op (engine is tested directly).
 
 namespace terramath {
 bool installTerrainHook(const std::string&, const std::string&) { return false; }
+bool installTerrainHookAuto(const ResolverConfig&, std::string& s) {
+    s = "host build";
+    return false;
+}
 bool terrainHookInstalled() { return false; }
 }  // namespace terramath
 

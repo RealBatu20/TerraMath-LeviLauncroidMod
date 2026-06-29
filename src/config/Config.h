@@ -16,6 +16,7 @@
 
 #include <string>
 
+#include "../hook/ResolverConfig.h"
 #include "../terrain/TerrainSettings.h"
 
 namespace terramath {
@@ -24,15 +25,11 @@ struct Config {
     TerrainSettings terrain;
     bool useDefaultFormula = true;
     std::string baseFormula = "";
-    // Empty => terrain hook stays disabled (engine/UI still usable). Populate
-    // from your binary; never ship a guessed value.
-    std::string terrainSignature = "";
 
-    // Which detour to install for the resolved function:
-    //   "height"  -> column surface-height seam (FormulaEngine::surfaceY)
-    //   "density" -> per-voxel solidity seam     (FormulaEngine::compute)
-    // Pick the one matching the function you identified (see HOOK_ANALYSIS.md).
-    std::string terrainHookMode = "height";
+    // Terrain-hook target resolution. Auto-detect is on by default, so the mod
+    // finds the generation function itself — no byte signature to paste. All of
+    // this is editable in the menu's Advanced section.
+    ResolverConfig resolver;
 
     // Load from path; returns defaults if the file is missing/unreadable.
     static Config load(const std::string& path);

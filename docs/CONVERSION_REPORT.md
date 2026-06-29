@@ -38,7 +38,7 @@ repo tree and `build.gradle` / loader sources.
 | `MathFunctionsRegistry` / `MathConstantsRegistry` | tables in `Expr.cpp` | FACT — identical name/arity/constant sets |
 | `CompositeNoise` (MC Perlin/Simplex/Normal/Blended) | `src/math/Noise.*` | INFERENCE — coherent seeded noise; **not** bit-identical to MC Java noise (see below) |
 | `TerraMathDensityFunction` | `src/terrain/FormulaEngine.*` | FACT — same density math; adds a surface-height path for Bedrock |
-| `NoiseRouterMixin` (density router) | native terrain hook (`src/hook/TerrainHook.cpp`) | HYPOTHESIS — Bedrock has no router; hook target must be found in `libminecraftpe.so` |
+| `NoiseRouterMixin` (density router) | auto-resolved native hook (`src/hook/AutoResolver.cpp` + `TerrainHook.cpp`) | HYPOTHESIS — Bedrock has no router; the hook target is auto-located in `libminecraftpe.so` via demangled-symbol scan, verified on-device |
 | `ModConfig` JSON | `src/config/Config.*` | FACT — JSON round-trip unit-tested |
 | Create-World settings tab + 3D preview | ImGui menu + 1D surface preview | INFERENCE — ImGui is the practical Bedrock-native UI path |
 | `TerrainData` world-NBT SavedData | local JSON config | INFERENCE — see NBT_ANALYSIS.md |
@@ -63,17 +63,21 @@ repo tree and `build.gradle` / loader sources.
 ## E. What was actually built and tested in this scaffold
 **FACT.**
 - Host build of the engine + config compiles clean under `-Wall -Wextra`.
-- `tests/test_formula.cpp` runs **47 checks, 0 failures** (arithmetic,
+- `tests/test_formula.cpp` runs **76 checks, 0 failures** (arithmetic,
   precedence, power right-assoc, constants vs scientific `e`, functions, gamma,
   factorial, erf, equation rewrite, error handling, noise determinism/bounds,
   end-to-end engine, config round-trip).
 
-## F. What was NOT done here (honest gaps)
+## F. Binary-dependent items (honest gaps)
 **FACT.**
-- No IDA Pro MCP and no `libminecraftpe.so` were available, so the terrain hook
-  signature is empty (not guessed) and the terrain hook is therefore inactive
-  until the user supplies it (docs/SIGNATURE_ANALYSIS.md).
-- The Android `.so` was not compiled here (needs NDK + Levi Launchroid SDK).
-  The Android sources are written against the documented SDK/NDK/ImGui APIs.
-- The ImGui touch-swallow behaviour and the terrain hook need on-device
-  validation (HYPOTHESIS) — see RENDERING_REPORT.md and TROUBLESHOOTING.md.
+- The terrain hook **auto-detects** its target at runtime by scanning
+  `libminecraftpe.so`'s demangled dynamic symbol table (`src/hook/AutoResolver.cpp`);
+  no signature is hardcoded or guessed. Whether the default symbol hints match a
+  given Bedrock build, and which seam (height vs density) that build's generator
+  wants, are **HYPOTHESIS** until verified on-device — both are editable in the
+  menu's Advanced section, with a manual-signature fallback.
+- The Android `.so` is not compiled in this scaffold environment (needs NDK +
+  Levi Launchroid SDK; CI builds it when `PRELOADER_GIT` is configured). The
+  Android sources are written against the documented SDK/NDK/ImGui APIs.
+- The ImGui touch-swallow behaviour needs on-device validation (HYPOTHESIS) —
+  see RENDERING_REPORT.md and TROUBLESHOOTING.md.

@@ -27,11 +27,14 @@ not binary-version-specific). One — the terrain hook — targets
   The implementation is complete; confirm on-device. Fallback route documented
   in TROUBLESHOOTING.md ("Touch passes through the menu").
 
-## 3. Terrain hook — `libminecraftpe.so`  🔵 needs your binary
-- **File:** `src/hook/TerrainHook.cpp`
-- **Target:** Bedrock's native column/terrain generation function. Resolved by
-  **signature** (`pl::signature::pl_resolve_signature(sig, "libminecraftpe.so")`)
-  read from config (`terrainSignature`). Hooked with `GlossHook`.
+## 3. Terrain hook — `libminecraftpe.so`  🟢 auto-resolved / 🔵 verify on your build
+- **Files:** `src/hook/AutoResolver.cpp` (locate) + `src/hook/TerrainHook.cpp` (hook).
+- **Target:** Bedrock's native column/terrain generation function. **Resolved
+  automatically** at load: `AutoResolver` walks the loaded `libminecraftpe.so`
+  dynamic symbol table, demangles names, and matches `terrainSymbolHints`. The
+  resolved address is hooked with `GlossHook`. A manual
+  `pl::signature::pl_resolve_signature(...)` path remains as a fallback when the
+  build is stripped of symbols.
 - **Integration seam (`TerrainColumnHeightFn`):** the detour assumes the
   resolved function has the shape
   ```cpp

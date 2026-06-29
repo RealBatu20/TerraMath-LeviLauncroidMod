@@ -24,7 +24,9 @@ device validation · ⬜ intentionally omitted.
 | 3D real-time preview | 🟡 | Replaced by a lightweight 1D surface-height preview (`PlotLines`) |
 | Multi-language UI strings | ⬜ | English-only menu; original lang files are not reused |
 | Server config (`config/terramath.json`) | ⬜ | Single-player/client-side scope; no server sync layer |
-| Actual world terrain override | 🔵 | Requires the terrain hook signature for your binary (SIGNATURE_ANALYSIS.md) |
+| Actual world terrain override | 🔵 | Hook target **auto-detected** at runtime (demangled symbol scan); confirm on your Bedrock build, Advanced section retargets if needed (SIGNATURE_ANALYSIS.md) |
+| One-tap formula presets | ✅ | 12 curated presets with matching params (not in the Java mod — a UX addition) |
+| Copy formula to clipboard | ✅ | Menu "Copy formula" button |
 | Touch interaction with the menu | 🔵 | Implemented via `AInputQueue` hook; confirm swallow behaviour on-device |
 
 ## Closest-compliant choices where exact parity isn't feasible
