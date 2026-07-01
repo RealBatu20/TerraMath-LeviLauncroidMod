@@ -76,9 +76,9 @@ Format the pattern as space-separated hex with `??` wildcards, e.g.:
 ```
 (Illustrative format only — yours will differ; do not copy this literally.)
 
-The exact wildcard/format conventions accepted by
-`pl::signature::pl_resolve_signature` are documented at
-<https://liteldev.github.io/LeviLaunchroid/api/signature>. Match that syntax.
+The in-repo scanner (`AutoResolver.cpp::resolveSignature`) accepts exactly this
+format: space-separated bytes, `??` (or `?`) for wildcards. It scans the
+executable segments of `libminecraftpe.so` for the first match.
 
 ## Step 4 — Wire it in
 Two ways, both with no recompile:

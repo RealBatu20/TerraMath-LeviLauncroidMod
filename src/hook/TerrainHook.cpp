@@ -41,7 +41,6 @@
 
 // Levi Launchroid / Gloss preloader SDK (provided by the build, see CMakeLists).
 #include "pl/Gloss.h"
-#include "pl/Signature.h"
 
 namespace terramath {
 namespace {
@@ -117,7 +116,7 @@ bool installTerrainHook(const std::string& signature, const std::string& mode) {
         return false;
     }
 
-    uintptr_t addr = pl::signature::pl_resolve_signature(signature.c_str(), "libminecraftpe.so");
+    uintptr_t addr = resolveSignature(signature);
     if (addr == 0) {
         TM_LOGE(
             "Failed to resolve terrainSignature against libminecraftpe.so. The "
@@ -154,8 +153,7 @@ bool installTerrainHookAuto(const ResolverConfig& cfg, std::string& outStatus) {
 
     // 2) Fallback: a manual signature, only if one was deliberately provided.
     if (!cfg.manualSignature.empty()) {
-        uintptr_t addr =
-            pl::signature::pl_resolve_signature(cfg.manualSignature.c_str(), "libminecraftpe.so");
+        uintptr_t addr = resolveSignature(cfg.manualSignature);
         if (addr != 0 && installAt(addr, cfg.hookMode)) {
             g_installed.store(true, std::memory_order_release);
             outStatus = "Hooked via manual signature.";

@@ -36,6 +36,12 @@ ResolveResult autoResolveTerrainFunction(const ResolverConfig& cfg);
 // pattern (e.g. "1f 20 03 d5 ..."). Used to surface/cache what was resolved.
 std::string generateSignature(uintptr_t address, std::size_t len = 16);
 
+// Manual-signature fallback: scan libminecraftpe.so's executable segments for a
+// byte pattern ("1F 20 03 D5 ?? ?? 94", spaces + `??` wildcards). Returns the
+// first matching address, or 0. Self-contained (no external signature lib), so
+// the mod links against only the prebuilt Gloss library.
+uintptr_t resolveSignature(const std::string& pattern);
+
 }  // namespace terramath
 
 #endif

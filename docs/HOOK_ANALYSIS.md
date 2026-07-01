@@ -32,9 +32,9 @@ not binary-version-specific). One — the terrain hook — targets
 - **Target:** Bedrock's native column/terrain generation function. **Resolved
   automatically** at load: `AutoResolver` walks the loaded `libminecraftpe.so`
   dynamic symbol table, demangles names, and matches `terrainSymbolHints`. The
-  resolved address is hooked with `GlossHook`. A manual
-  `pl::signature::pl_resolve_signature(...)` path remains as a fallback when the
-  build is stripped of symbols.
+  resolved address is hooked with `GlossHook`. A manual byte-signature scan
+  (`AutoResolver.cpp::resolveSignature`, self-contained) remains as a fallback
+  when the build is stripped of symbols.
 - **Integration seam (`TerrainColumnHeightFn`):** the detour assumes the
   resolved function has the shape
   ```cpp

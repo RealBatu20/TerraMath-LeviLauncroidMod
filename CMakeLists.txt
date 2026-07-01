@@ -34,9 +34,9 @@ if(ANDROID)
 
     if(NOT PRELOADER_INCLUDE OR NOT EXISTS "${PRELOADER_INCLUDE}/pl/Gloss.h")
         message(FATAL_ERROR
-            "PRELOADER_INCLUDE must point to the Levi Launchroid SDK include dir "
+            "PRELOADER_INCLUDE must point to the preloader-android 'src' dir "
             "(containing pl/Gloss.h). See docs/BUILD.md. "
-            "Example: -DPRELOADER_INCLUDE=/path/to/preloader-android/include")
+            "Example: -DPRELOADER_INCLUDE=/path/to/preloader-android/src")
     endif()
 
     # --- ImGui (render UI) -------------------------------------------------

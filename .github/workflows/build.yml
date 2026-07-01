@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # Levi Launchroid / Gloss preloader SDK: provides pl/Gloss.h + prebuilt
+  # libGlossHook.a. Override via the PRELOADER_GIT repo variable if you fork it.
+  PRELOADER_GIT: ${{ vars.PRELOADER_GIT != '' && vars.PRELOADER_GIT || 'https://github.com/LiteLDev/preloader-android' }}
+
 jobs:
   # Always-on gate: the portable formula engine must compile and pass tests.
   tests:
@@ -20,16 +25,15 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build-host --output-on-failure
 
-  # Android .so build. Runs only when the Levi Launchroid SDK location is
-  # configured as a repo variable `PRELOADER_GIT` (a git URL whose checkout
-  # exposes include/pl/Gloss.h). Without it the job is skipped, not failed,
-  # because the SDK cannot be fetched from a guessed location.
+  # Build libterramath.so (arm64-v8a) against the real preloader SDK.
   android:
     runs-on: ubuntu-latest
     needs: tests
-    if: ${{ vars.PRELOADER_GIT != '' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - name: Set up Android NDK
         uses: nttld/setup-ndk@v1
@@ -37,8 +41,8 @@ jobs:
         with:
           ndk-version: r26d
 
-      - name: Fetch Levi Launchroid / Gloss preloader SDK
-        run: git clone --depth 1 "${{ vars.PRELOADER_GIT }}" preloader
+      - name: Fetch preloader-android (pl/Gloss.h + libGlossHook.a)
+        run: git clone --depth 1 "$PRELOADER_GIT" preloader
 
       - name: Configure (arm64-v8a)
         env:
@@ -49,7 +53,8 @@ jobs:
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPRELOADER_INCLUDE="${{ github.workspace }}/preloader/include"
+            -DPRELOADER_INCLUDE="${{ github.workspace }}/preloader/src" \
+            -DPRELOADER_LIB="${{ github.workspace }}/preloader/lib/ARM64/libGlossHook.a"
 
       - name: Build
         run: cmake --build build-android -j
@@ -58,6 +63,7 @@ jobs:
         run: |
           mkdir -p dist
           cp "$(find build-android -name 'libterramath.so' | head -n1)" dist/libterramath.so
+          ls -la dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -66,32 +72,21 @@ jobs:
           path: dist/libterramath.so
           if-no-files-found: error
 
-  # Publish a GitHub Release on every v* tag. Runs once tests pass, regardless
-  # of whether the Android job ran — the .so is attached only if it was built
-  # (i.e. when the SDK is configured), so tagging always produces a Release.
+  # Publish a GitHub Release on every v* tag, with the built .so attached.
   release:
     runs-on: ubuntu-latest
     needs: [tests, android]
-    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') && needs.tests.result == 'success' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Android artifact (if built)
+      - name: Download Android artifact
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: libterramath-arm64-v8a
           path: dist
-
-      - name: Note when the .so is absent
-        run: |
-          if [ ! -f dist/libterramath.so ]; then
-            echo "No libterramath.so attached: set the repo variable PRELOADER_GIT" \
-                 "to the Levi Launchroid SDK git URL so the android job can build it." \
-                 | tee dist-note.txt
-          fi
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

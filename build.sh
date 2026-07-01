@@ -7,12 +7,15 @@
 #
 # Android build requirements (export before running, or pass as flags):
 #   ANDROID_NDK_HOME   path to the Android NDK (r26+ recommended, has clang/C++20)
-#   PRELOADER_INCLUDE  dir containing pl/Gloss.h, pl/Signature.h, pl/Logger.h
-#   PRELOADER_LIB      (optional) Gloss/preloader link library
+#   PRELOADER_INCLUDE  preloader-android 'src' dir (contains pl/Gloss.h)
+#   PRELOADER_LIB      prebuilt Gloss lib, e.g. .../lib/ARM64/libGlossHook.a
+#
+# Get the SDK once:  git clone https://github.com/LiteLDev/preloader-android
 #
 # Example:
 #   ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/26.3.11579264 \
-#   PRELOADER_INCLUDE=$HOME/preloader-android/include \
+#   PRELOADER_INCLUDE=$HOME/preloader-android/src \
+#   PRELOADER_LIB=$HOME/preloader-android/lib/ARM64/libGlossHook.a \
 #   ./build.sh android
 set -euo pipefail
 

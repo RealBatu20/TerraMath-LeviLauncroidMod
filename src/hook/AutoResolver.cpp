@@ -7,6 +7,7 @@
 #include <elf.h>
 #include <link.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -154,6 +155,62 @@ ResolveResult scanDynsym(const Module& m, const std::vector<std::string>& hints)
 }
 
 }  // namespace
+
+namespace {
+// Parse a "1F 20 ?? D5" pattern into bytes + wildcard mask.
+bool parsePattern(const std::string& pat, std::vector<uint8_t>& bytes,
+                  std::vector<bool>& wild) {
+    size_t i = 0;
+    while (i < pat.size()) {
+        while (i < pat.size() && std::isspace(static_cast<unsigned char>(pat[i]))) ++i;
+        if (i >= pat.size()) break;
+        if (pat[i] == '?') {
+            bytes.push_back(0);
+            wild.push_back(true);
+            ++i;
+            if (i < pat.size() && pat[i] == '?') ++i;
+        } else {
+            char* end = nullptr;
+            long v = std::strtol(pat.c_str() + i, &end, 16);
+            if (end == pat.c_str() + i || v < 0 || v > 0xff) return false;
+            bytes.push_back(static_cast<uint8_t>(v));
+            wild.push_back(false);
+            i = static_cast<size_t>(end - pat.c_str());
+        }
+    }
+    return !bytes.empty();
+}
+}  // namespace
+
+uintptr_t resolveSignature(const std::string& pattern) {
+    std::vector<uint8_t> bytes;
+    std::vector<bool> wild;
+    if (!parsePattern(pattern, bytes, wild)) return 0;
+
+    Module m = findModule();
+    if (!m.found) return 0;
+
+    const size_t n = bytes.size();
+    for (int i = 0; i < m.phnum; ++i) {
+        const ElfW(Phdr)& ph = m.phdr[i];
+        if (ph.p_type != PT_LOAD || !(ph.p_flags & PF_X)) continue;
+        const uint8_t* start = reinterpret_cast<const uint8_t*>(m.base + ph.p_vaddr);
+        size_t len = ph.p_memsz;
+        if (len < n) continue;
+        for (size_t off = 0; off + n <= len; ++off) {
+            const uint8_t* p = start + off;
+            bool hit = true;
+            for (size_t k = 0; k < n; ++k) {
+                if (!wild[k] && p[k] != bytes[k]) {
+                    hit = false;
+                    break;
+                }
+            }
+            if (hit) return reinterpret_cast<uintptr_t>(p);
+        }
+    }
+    return 0;
+}
 
 std::string generateSignature(uintptr_t address, std::size_t len) {
     if (address == 0) return "";

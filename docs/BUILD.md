@@ -20,12 +20,18 @@ ctest --test-dir build-host --output-on-failure
 Expected: `100% tests passed` (76 checks in the formula-engine suite).
 
 ## 2. Levi Launchroid / Gloss SDK
-The Android target needs the preloader headers (`pl/Gloss.h`, `pl/Signature.h`,
-`pl/Logger.h`) and the Gloss link library. Obtain them from the official Levi
-Launchroid native-mod template / preloader. Then point the build at them:
-- `PRELOADER_INCLUDE` → the directory that contains `pl/Gloss.h`.
-- `PRELOADER_LIB` → the Gloss/preloader library to link (optional if the SDK is
-  header-only in your setup).
+The Android target needs the preloader header `pl/Gloss.h` (for `GlossInit` /
+`GlossHook`) and the prebuilt Gloss static library. Both ship in the official
+repo — just clone it:
+```bash
+git clone https://github.com/LiteLDev/preloader-android
+```
+Then point the build at:
+- `PRELOADER_INCLUDE` → `preloader-android/src` (contains `pl/Gloss.h`).
+- `PRELOADER_LIB` → `preloader-android/lib/ARM64/libGlossHook.a`.
+
+(The manual byte-signature scan is implemented in-repo — `AutoResolver.cpp` — so
+no separate signature library is needed.)
 
 API references:
 - Getting started: <https://liteldev.github.io/LeviLaunchroid/guide/getting-started>
@@ -35,8 +41,8 @@ API references:
 ## 3. Android build (arm64-v8a)
 ```bash
 ANDROID_NDK_HOME=/path/to/android-ndk-r26d \
-PRELOADER_INCLUDE=/path/to/preloader/include \
-PRELOADER_LIB=/path/to/libgloss.a \
+PRELOADER_INCLUDE=/path/to/preloader-android/src \
+PRELOADER_LIB=/path/to/preloader-android/lib/ARM64/libGlossHook.a \
 ./build.sh android
 ```
 Equivalent manual invocation:
@@ -60,15 +66,16 @@ keeps the shared object small and strips debug symbols for distribution.
 ## 4. Install on device
 1. Copy `libterramath.so` into the Levi Launchroid mods directory.
 2. Launch Minecraft Bedrock; tap the **TerraMath** button to open the menu.
-3. (For terrain override) set `terrainSignature` in
-   `…/games/com.mojang/terramath/terramath.json` — see SIGNATURE_ANALYSIS.md.
+3. Pick a preset or type a formula, **Apply**, **Save**. The terrain hook
+   auto-installs at launch (adjust in the menu's Advanced section if a build is
+   symbol-stripped — see SIGNATURE_ANALYSIS.md).
 
 ## 5. CI / releases
 `.github/workflows/build.yml`:
 - `tests` job: builds + runs host tests on every push/PR (the gate).
-- `android` job: builds the `.so` and uploads it as an artifact — runs only when
-  the repo variable `PRELOADER_GIT` is set to a git URL whose checkout exposes
-  `include/pl/Gloss.h` (so the SDK isn't fetched from a guessed location).
+- `android` job: clones `preloader-android` (or the `PRELOADER_GIT` repo variable
+  if you override it), then builds `libterramath.so` and uploads it as an
+  artifact. Runs on every push/PR.
 - `release` job: on every `v*` tag, once tests pass, publishes a GitHub Release
   with auto-generated notes. The `libterramath.so` is attached **only if the
   android job built it** (i.e. when `PRELOADER_GIT` is set); otherwise the
