@@ -137,7 +137,7 @@ ResolveResult scanDynsym(const Module& m, const std::vector<std::string>& hints)
 
     for (uint32_t i = 0; i < count; ++i) {
         const ElfW(Sym)& s = symtab[i];
-        if (ELF_ST_TYPE(s.st_info) != STT_FUNC) continue;
+        if ((s.st_info & 0xf) != STT_FUNC) continue;  // ELF*_ST_TYPE
         if (s.st_value == 0 || s.st_name == 0) continue;
         const char* raw = strtab + s.st_name;
         std::string name = demangle(raw);
